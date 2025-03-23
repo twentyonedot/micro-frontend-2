@@ -1,0 +1,77 @@
+import { init } from "@module-federation/runtime";
+
+console.log("Remote: Component.js is executing");
+
+let apiData = { title: "Loading..." };
+let error = null;
+
+const loadAxios = async () => {
+  try {
+    // Initialize the shared scope
+    await init("default");
+    console.log("Remote: Shared scope initialized");
+    
+    // Try to get axios from the global window object first (fallback)
+    let axios;
+    if (window.axios) {
+      console.log("Remote: Using axios from window object");
+      axios = window.axios;
+    } else {
+      // Otherwise try to import it from the shared scope
+      console.log("Remote: Trying to import axios from shared scope");
+      axios = (await import("axios")).default;
+    }
+    
+    console.log("Remote: Axios loaded successfully", axios);
+    
+    // Make a test API call to JSONPlaceholder
+    const response = await axios.get("https://jsonplaceholder.typicode.com/todos/2");
+    console.log("Remote: API Response:", response.data);
+    apiData = response.data;
+    
+    // Update the DOM if the component is already rendered
+    const dataElement = document.getElementById('remote-api-data');
+    if (dataElement) {
+      dataElement.textContent = JSON.stringify(apiData, null, 2);
+    }
+  } catch (err) {
+    console.error("Remote: Failed to load/use axios:", err);
+    error = err.message;
+    
+    // Update the DOM with the error if the component is already rendered
+    const dataElement = document.getElementById('remote-api-data');
+    if (dataElement) {
+      dataElement.textContent = `Error: ${error}`;
+    }
+  }
+};
+
+// Initialize immediately
+loadAxios();
+
+export default () => {
+  console.log("Remote: Returning component output");
+  
+  // Create a component that displays the API data
+  setTimeout(() => {
+    const dataElement = document.getElementById('remote-api-data');
+    if (dataElement) {
+      if (error) {
+        dataElement.textContent = `Error: ${error}`;
+      } else {
+        dataElement.textContent = JSON.stringify(apiData, null, 2);
+      }
+    }
+  }, 100); // Small delay to ensure the DOM element exists
+  
+  return `
+    <div style="padding: 20px; border: 2px solid #3498db; border-radius: 8px; margin-top: 20px;">
+      <h2 style="color: #3498db;">Remote App Component</h2>
+      <p>This component is loaded from the remote app and uses axios from the host app.</p>
+      <h3>API Data (from JSONPlaceholder):</h3>
+      <pre id="remote-api-data" style="background-color: #f8f9fa; padding: 10px; border-radius: 4px;">
+        ${error ? `Error: ${error}` : JSON.stringify(apiData, null, 2)}
+      </pre>
+    </div>
+  `;
+};
